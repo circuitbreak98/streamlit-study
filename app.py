@@ -39,26 +39,28 @@ date_dependencies = {docA:[docB, weight] for docA, docB, weight in dependencies}
 ordered_docs = list(nx.topological_sort(G))
 
 
-# Assign publication dates
-current_date = pd.Timestamp('2023-01-01')
-holidays = [pd.Timestamp('2023-01-01'), pd.Timestamp('2023-01-02')]
-
-# Sample holidays list (e.g., '2023-07-04' for Independence Day)
-
-# Dictionary to store the allocated Timestamp for each item
-allocated_dates = {}
-for item in ordered_docs:
-    # Check if the current date is a weekday and not a holiday
-    while current_date.weekday() >= 5 or current_date in holidays:
-        current_date += pd.Timedelta(days=date_dependencies[item][1])
-    allocated_dates[item] = current_date
-    
-    current_date += pd.Timedelta(days=1)
-
 def app():
     st.title("FW issue-date-generator")
-    st.slider('start_date')
-    st.slider('end_date')
+    st.sidebar.subheader("options")
+
+    # Assign publication dates
+    current_date = st.sidebar.date_input('start_date')
+    #b = st.sidebar.date_input('end_date')
+    
+    holidays = [pd.Timestamp('2023-01-01'), pd.Timestamp('2023-01-02')]
+
+    # Sample holidays list (e.g., '2023-07-04' for Independence Day)
+
+    # Dictionary to store the allocated Timestamp for each item
+    allocated_dates = {}
+    for item in ordered_docs:
+        # Check if the current date is a weekday and not a holiday
+        while current_date.weekday() >= 5 or current_date in holidays:
+            current_date += pd.Timedelta(days=1)
+        allocated_dates[item] = current_date
+        date_dependencies
+        current_date += pd.Timedelta(days=date_dependencies[item][1])
+
     # Use AgGrid for inline editing
     dates_df = pd.DataFrame(list(allocated_dates.items()), columns=['문서명','날짜'])
     grid_response = AgGrid(dates_df, editable=True, height=600, width=400, fit_columns_on_grid_load=True)
