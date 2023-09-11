@@ -12,8 +12,8 @@ def load_data():
 
 
 # Create dependency edges from the dataframe
-def create_dependency_edges(dependency_list):
-    dependencies = [[elem, lst[0], 2] for lst in dependency_list for elem in lst[1:] if not pd.isna(elem)]
+def create_dependency_edges(dependency_list, configs):
+    dependencies = [[elem, lst[0], 1] for lst in dependency_list for elem in lst[1:] if not pd.isna(elem)]
     return dependencies
 
 
@@ -28,11 +28,9 @@ def sort_ordered_docs(documents, dependencies):
 
 
 # Select the publication stages from the dataframe
-def select_publication_stages(stage):
+def select_publication_stages(stage, configs):
     dependency_list = stage.loc[:, "문서명":].values.tolist()
-    documents, dependencies = stage["문서명"].values.tolist(), create_dependency_edges(dependency_list)
-    st.write(dependencies)
-    dependencies
+    documents, dependencies = stage["문서명"].values.tolist(), create_dependency_edges(dependency_list, configs)
     return sort_ordered_docs(documents, dependencies)
 
 
@@ -55,21 +53,29 @@ def allocate_dates_between(start_date, end_date, ordered_docs, holidays=[]):
 
 # Main Streamlit app
 def app():
+    st.set_page_config(layout="wide")
     st.title("FW issue-date-generator")
 
     st.sidebar.subheader("설정")
 
     df = load_data()
+    
+    safety_analysis_included = st.sidebar.checkbox("안전성 분석 보고서 포함", value=True)
+    cyber_security_included = st.sidebar.checkbox("사이버보안 평가 보고서 포함", value=True)
 
-    documents_display = st.multiselect("## 발행할 문서를 고르세요 :sunglasses:", list(df[df.columns[1]]), list(df[df.columns[1]]))
+    if not safety_analysis_included:
+        df = df[~df['문서명'].str.contains('안전성 분석')]
 
-    filtered_df = df[df["문서명"].isin(documents_display)]
-    ordered_docs, date_dependencies = select_publication_stages(filtered_df)
+    if not cyber_security_included:
+        df = df[~df['문서명'].str.contains('사이버보안')]
+        
+    filtered_df = df
+
 
     # Sample holidays list
     holidays = [pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-02")]
 
-    # Assign publication dates
+    #TODO Assign publication dates conditions to a single configuration
     spec_date = st.sidebar.date_input("요구사항 명세서 발행일")
     design_date = st.sidebar.date_input("설계 명세서 발행일")
     impl_date = st.sidebar.date_input("구현 명세서 발행일")
@@ -77,6 +83,8 @@ def app():
     ct_dates = st.sidebar.number_input("CT 시험 수행일", min_value=1, value=3)
     it_dates = st.sidebar.number_input("IT 시험 수행일", min_value=1, value=3)
     st_dates = st.sidebar.number_input("ST 시험 수행일", min_value=1, value=3)
+
+    ordered_docs, date_dependencies = select_publication_stages(filtered_df, None)
 
     allocated_dates = {}
 
@@ -89,6 +97,7 @@ def app():
     # Display the dates in AgGrid
     st.write("## dates_df")
     dates_df = pd.DataFrame(list(allocated_dates.items()), columns=["문서명", "날짜"])
+    dates_df['날짜'] = pd.to_datetime(dates_df['날짜']).dt.strftime('%y.%m.%d')
     grid_response = AgGrid(dates_df, editable=True, height=600, width=400, fit_columns_on_grid_load=True)
     updated_df = pd.DataFrame(grid_response["data"])
 
