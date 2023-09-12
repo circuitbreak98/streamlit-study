@@ -1,6 +1,9 @@
+import datetime
+
 import networkx as nx
 import pandas as pd
 import streamlit as st
+
 from st_aggrid import AgGrid
 
 
@@ -68,26 +71,34 @@ def app():
 
     if not cyber_security_included:
         df = df[~df['문서명'].str.contains('사이버보안')]
-        
+    
     filtered_df = df
 
 
     # Sample holidays list
     holidays = [pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-02")]
 
-    #TODO Assign publication dates conditions to a single configuration
-    spec_date = st.sidebar.date_input("요구사항 명세서 발행일")
-    design_date = st.sidebar.date_input("설계 명세서 발행일")
-    impl_date = st.sidebar.date_input("구현 명세서 발행일")
-    end_date = st.sidebar.date_input("발행 마감일")
-    ct_dates = st.sidebar.number_input("CT 시험 수행일", min_value=1, value=3)
-    it_dates = st.sidebar.number_input("IT 시험 수행일", min_value=1, value=3)
-    st_dates = st.sidebar.number_input("ST 시험 수행일", min_value=1, value=3)
+    # Assign publication dates conditions to a single configuration
+    with st.sidebar.form('입력문서 발행일자 설정'):
+        spec_date = st.date_input("요구사항 명세서 발행일", value=datetime.date(2023,4,19))
+        design_date = st.date_input("설계 명세서 발행일", value=datetime.date(2023,4,26))
+        impl_date = st.date_input("구현 명세서 발행일", value=datetime.date(2023,5,10))
+        end_date = st.date_input("발행 마감일", value=datetime.date(2023,6,2))
+        ct_dates = st.number_input("CT 시험 수행일", min_value=1, value=3)
+        it_dates = st.number_input("IT 시험 수행일", min_value=1, value=3)
+        st_dates = st.number_input("ST 시험 수행일", min_value=1, value=3)
+        submitted = st.form_submit_button('확인')
 
+    if submitted:
+        st.write(spec_date, design_date, impl_date, end_date, ct_dates, it_dates, st_dates)
+
+    #TODO re-implement date scheduling algorithm
     ordered_docs, date_dependencies = select_publication_stages(filtered_df, None)
-
+    st.write("st.write(date_dependencies)")
+    st.write(date_dependencies)
     allocated_dates = {}
-
+    
+    #TODO re-implement date scheduling algorithm
     for item in ordered_docs:
         while spec_date.weekday() >= 5 or spec_date in holidays:
             spec_date += pd.Timedelta(days=1)
