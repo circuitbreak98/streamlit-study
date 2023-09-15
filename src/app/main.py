@@ -5,7 +5,8 @@ import pandas as pd
 import streamlit as st
 from st_aggrid import AgGrid
 
-from csp import CSP, Constraint
+from csp import CSP
+from date_generation import PublicationDependencyConstraint, date_range
 
 # Load the Excel data and clean it
 def load_data():
@@ -83,9 +84,9 @@ def app():
     # Assign publication dates conditions to a single configuration
     with st.sidebar.form('입력문서 발행일자 설정'):
         spec_date = st.date_input("요구사항 명세서 발행일",value=datetime.date.today())
-        design_date = st.date_input("설계 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=1))
-        impl_date = st.date_input("구현 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=2))
-        end_date = st.date_input("발행 마감일", value=datetime.date.today()+datetime.timedelta(days=3))
+        design_date = st.date_input("설계 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=7))
+        impl_date = st.date_input("구현 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=14))
+        end_date = st.date_input("발행 마감일", value=datetime.date.today()+datetime.timedelta(days=21))
         expander = st.expander("시험 수행 소요일자")
         with expander:
             ct_dates = st.number_input("CT 시험", min_value=1, value=3)
