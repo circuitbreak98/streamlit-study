@@ -21,16 +21,16 @@ def create_dependency_edges_reserved(dependency_list, configs):
     return dependencies
 
 def create_dependency_edges(dependency_list, configs):
-    dependencies = [[elem, lst[0], 1] for lst in dependency_list for elem in lst[1:] if not pd.isna(elem)]
+    dependencies = [[elem, lst[0]] for lst in dependency_list for elem in lst[1:] if not pd.isna(elem)]
     return dependencies
 
 # Sort the documents based on their dependencies
 def sort_ordered_docs(documents, dependencies):
     G = nx.DiGraph()
     G.add_nodes_from(documents)
-    G.add_weighted_edges_from(dependencies)
+    G.add_edges_from(dependencies)
     ordered_docs = list(nx.topological_sort(G))
-    date_dependencies = {docA: [docB, weight] for docA, docB, weight in dependencies}
+    date_dependencies = {docA: docB for docA, docB in dependencies}
     return ordered_docs, date_dependencies
 
 
@@ -43,19 +43,32 @@ def select_publication_stages(stage, configs):
 
 # Allocate publication dates for documents between start_date and end_date.
 # Not Used Function
-def allocate_dates_between(start_date, end_date, ordered_docs, holidays=[]):
-    allocated_dates = {}
-    current_date = start_date
-    num_docs = len(ordered_docs)
-    days_between = (end_date - start_date) / num_docs
+def allocate_dates(start_date, end_date, holidays, acc_docs):
+    pass
 
-    for item in ordered_docs:
-        while current_date.weekday() >= 5 or current_date in holidays:
-            current_date += pd.Timedelta(days=1)
-        allocated_dates[item] = current_date
-        current_date += days_between
+def allocate_dates_with_csp(spec, design, impl, end, holidays, documents, constraints):
+    date_list = list(date_range(spec, end, holidays))
+    variables = documents
+    domains = {}
 
-    return allocated_dates
+    for variable in variables:
+        if variable == "요구사항 명세서":
+            domains[variable] = [spec]
+        elif variable == "설계 명세서":
+            domains[variable] = [design]
+        elif variable == "소스코드 구현명세서":
+            domains[variable] = [impl]
+        else:
+            domains[variable] = date_list
+
+    csp = CSP[str, datetime.date](variables, domains)
+
+    for docA, docB in constraints.items():
+        st.write(docA, docB)
+        csp.add_constraint(PublicationDependencyConstraint(docA, docB))
+
+    return csp.backtracking_search()
+
 
 
 # Main Streamlit app
@@ -71,7 +84,7 @@ def app():
     cyber_security_included = st.sidebar.checkbox("사이버보안 평가 보고서 포함", value=True)
 
     if not safety_analysis_included:
-        df = df[~df['문서명'].str.contains('안전성 분석')]
+        df = df[~df['문서명'].str.contains('안전성')]
 
     if not cyber_security_included:
         df = df[~df['문서명'].str.contains('사이버보안')]
@@ -94,29 +107,24 @@ def app():
             st_dates = st.number_input("ST 시험", min_value=1, value=3)
         submitted = st.form_submit_button('확인')
 
-    if submitted:
-        st.write(spec_date, design_date, impl_date, end_date, ct_dates, it_dates, st_dates)
-
-    #TODO re-implement date scheduling algorithm
     ordered_docs, date_dependencies = select_publication_stages(filtered_df, None)
-    allocated_dates = {}
-    
-    #TODO re-implement date scheduling algorithm
-    for item in ordered_docs:
-        while spec_date.weekday() >= 5 or spec_date in holidays:
-            spec_date += pd.Timedelta(days=1)
-        allocated_dates[item] = spec_date
-        spec_date += pd.Timedelta(days=date_dependencies.get(item, [None, 1])[1])
+
+    if submitted:
+        #st.write(spec_date, design_date, impl_date, end_date, ct_dates, it_dates, st_dates)
+        allocated_dates = allocate_dates_with_csp(spec_date, design_date, impl_date, end_date, holidays, documents=ordered_docs, constraints=date_dependencies)
+        st.write("## dates_df")
+        dates_df = pd.DataFrame(list(allocated_dates.items()), columns=["문서명", "날짜"])
+        dates_df['날짜'] = pd.to_datetime(dates_df['날짜']).dt.strftime('%y.%m.%d')
+        grid_response = AgGrid(dates_df, editable=True, height=600, width=400, fit_columns_on_grid_load=True)
+        updated_df = pd.DataFrame(grid_response["data"])
+
+        st.subheader("Updated DataFrame:")
+        st.write(updated_df)
+
+    #allocated_dates = {}
 
     # Display the dates in AgGrid
-    st.write("## dates_df")
-    dates_df = pd.DataFrame(list(allocated_dates.items()), columns=["문서명", "날짜"])
-    dates_df['날짜'] = pd.to_datetime(dates_df['날짜']).dt.strftime('%y.%m.%d')
-    grid_response = AgGrid(dates_df, editable=True, height=600, width=400, fit_columns_on_grid_load=True)
-    updated_df = pd.DataFrame(grid_response["data"])
 
-    st.subheader("Updated DataFrame:")
-    st.write(updated_df)
 
 
 if __name__ == "__main__":
