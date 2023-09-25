@@ -23,7 +23,10 @@ class CSP(Generic[V, D]):
             self.constraints[variable] = []
             if variable not in self.domains:
                 raise LookupError("모든 변수에 도메인이 할당되어야 합니다.")
-            
+    
+    def __repr__(self) -> str:
+        return f"Variables: {self.variables}\nDomains: {self.domains}\nConstraints: {self.constraints}"
+
     def add_constraint(self, constraint: Constraint[V, D]) -> None:
         for variable in constraint.variables:
             if variable not in self.variables:
@@ -36,7 +39,7 @@ class CSP(Generic[V, D]):
             if not constraint.satisfied(assignment):
                 return False
         return True
-        
+    '''
     def backtracking_search(self, assignment: Dict[V, D] = {}) -> Optional[Dict[V, D]]:
         #assignment는 모든 변수가 할당될 때 완료된다.(base condition)
         if len(assignment) == len(self.variables):
@@ -50,11 +53,53 @@ class CSP(Generic[V, D]):
         for value in self.domains[first]:
             local_assignment = assignment.copy()
             local_assignment[first] = value
+            
             #local_assignment 값이 일관적이면 재귀 호출한다.
             if self.consistent(first, local_assignment):
                 result: Optional[Dict[V,D]] = self.backtracking_search(
                     local_assignment)
                 #결과를 찾지 못하면 백트래킹을 종료한다.
                 if result is not None:
+                    
                     return result
+    
         return None # 솔루션 없음 
+    
+    '''
+    def backtracking_search(self, assignment: Dict[V, D] = {}) -> Optional[Dict[V, D]]:
+        # Base condition: assignment is complete when all variables have been assigned
+        if len(assignment) == len(self.variables):
+            return assignment
+
+        # Get all unassigned variables
+        unassigned: List[V] = [v for v in self.variables if v not in assignment]
+
+        # Get the first unassigned variable
+        first: V = unassigned[0]
+        original_domain = self.domains[first].copy()
+        
+        # Split the domain into two parts
+        mid = len(original_domain) // 2
+        split1 = original_domain[:mid]
+        split2 = original_domain[mid:]
+        
+        for subdomain in [split1, split2]:
+            self.domains[first] = subdomain
+
+            for value in subdomain:
+                local_assignment = assignment.copy()
+                local_assignment[first] = value
+
+                # If the local assignment is consistent, proceed with recursion
+                if self.consistent(first, local_assignment):
+                    result: Optional[Dict[V, D]] = self.backtracking_search(local_assignment)
+                    
+                    # If a result is found, return it
+                    if result is not None:
+                        return result
+
+            # Restore the original domain after exploring a subdomain
+            self.domains[first] = original_domain
+
+        return None  # No solution found
+

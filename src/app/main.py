@@ -38,7 +38,7 @@ def sort_ordered_docs(documents, dependencies):
 def select_publication_stages(stage, configs):
     dependency_list = stage.loc[:, "문서명":].values.tolist()
     documents, dependencies = stage["문서명"].values.tolist(), create_dependency_edges(dependency_list, configs)
-    return sort_ordered_docs(documents, dependencies)
+    return (documents, dependencies)
 
 
 # Allocate publication dates for documents between start_date and end_date.
@@ -47,7 +47,10 @@ def allocate_dates(start_date, end_date, holidays, acc_docs):
     pass
 
 def allocate_dates_with_csp(spec, design, impl, end, holidays, documents, constraints):
-    date_list = list(date_range(spec, end, holidays))
+    spec_date_list = list(date_range(spec, design, holidays))
+    design_date_list = list(date_range(design, impl, holidays))
+    remaining_date_list = list(date_range(impl, end, holidays))
+
     variables = documents
     domains = {}
 
@@ -58,15 +61,18 @@ def allocate_dates_with_csp(spec, design, impl, end, holidays, documents, constr
             domains[variable] = [design]
         elif variable == "소스코드 구현명세서":
             domains[variable] = [impl]
+        elif variable in ["요구사항 명세 검증보고서", "시스템 시험 계획서", "요구사항 안전성 분석 보고서", "요건단계 사이버보안 평가 보고서"]:
+            domains[variable] = spec_date_list
+        elif variable in ["설계 명세 검증보고서", "컴포넌트 시험 계획서", "통합시험 계획서", "설계 안전성 분석 보고서", "설계단계 사이버보안 평가 보고서"]:
+            domains[variable] = design_date_list
         else:
-            domains[variable] = date_list
+            domains[variable] = remaining_date_list
 
     csp = CSP[str, datetime.date](variables, domains)
 
-    for docA, docB in constraints.items():
-        st.write(docA, docB)
+    for docA, docB in constraints:
         csp.add_constraint(PublicationDependencyConstraint(docA, docB))
-
+    
     return csp.backtracking_search()
 
 
@@ -90,7 +96,6 @@ def app():
         df = df[~df['문서명'].str.contains('사이버보안')]
     
     filtered_df = df
-
     # Sample holidays list
     holidays = [pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-02")]
 
@@ -108,18 +113,20 @@ def app():
         submitted = st.form_submit_button('확인')
 
     ordered_docs, date_dependencies = select_publication_stages(filtered_df, None)
-
+    
     if submitted:
-        #st.write(spec_date, design_date, impl_date, end_date, ct_dates, it_dates, st_dates)
         allocated_dates = allocate_dates_with_csp(spec_date, design_date, impl_date, end_date, holidays, documents=ordered_docs, constraints=date_dependencies)
-        st.write("## dates_df")
-        dates_df = pd.DataFrame(list(allocated_dates.items()), columns=["문서명", "날짜"])
-        dates_df['날짜'] = pd.to_datetime(dates_df['날짜']).dt.strftime('%y.%m.%d')
-        grid_response = AgGrid(dates_df, editable=True, height=600, width=400, fit_columns_on_grid_load=True)
-        updated_df = pd.DataFrame(grid_response["data"])
+        if allocate_dates is None:
+            st.write("## Unsatisfied")
+        else:
+            st.write("## dates_df")
+            dates_df = pd.DataFrame(list(allocated_dates.items()), columns=["문서명", "날짜"])
+            dates_df['날짜'] = pd.to_datetime(dates_df['날짜']).dt.strftime('%y.%m.%d')
+            grid_response = AgGrid(dates_df, editable=True, height=600, width=400, fit_columns_on_grid_load=True)
+            updated_df = pd.DataFrame(grid_response["data"])
 
-        st.subheader("Updated DataFrame:")
-        st.write(updated_df)
+            st.subheader("Updated DataFrame:")
+            st.write(updated_df)
 
     #allocated_dates = {}
 
