@@ -14,37 +14,16 @@ def load_data():
     df.replace("\xa0", " ", regex=True, inplace=True)
     return df
 
-
 # Create dependency edges from the dataframe
-def create_dependency_edges_reserved(dependency_list, configs):
-    dependencies = [[elem, lst[0], 1] for lst in dependency_list for elem in lst[1:] if not pd.isna(elem)]
-    return dependencies
-
 def create_dependency_edges(dependency_list, configs):
     dependencies = [[elem, lst[0]] for lst in dependency_list for elem in lst[1:] if not pd.isna(elem)]
     return dependencies
-
-# Sort the documents based on their dependencies
-def sort_ordered_docs(documents, dependencies):
-    G = nx.DiGraph()
-    G.add_nodes_from(documents)
-    G.add_edges_from(dependencies)
-    ordered_docs = list(nx.topological_sort(G))
-    date_dependencies = {docA: docB for docA, docB in dependencies}
-    return ordered_docs, date_dependencies
-
 
 # Select the publication stages from the dataframe
 def select_publication_stages(stage, configs):
     dependency_list = stage.loc[:, "문서명":].values.tolist()
     documents, dependencies = stage["문서명"].values.tolist(), create_dependency_edges(dependency_list, configs)
     return (documents, dependencies)
-
-
-# Allocate publication dates for documents between start_date and end_date.
-# Not Used Function
-def allocate_dates(start_date, end_date, holidays, acc_docs):
-    pass
 
 def allocate_dates_with_csp(spec, design, impl, end, holidays, documents, constraints):
     spec_date_list = list(date_range(spec, design, holidays))
@@ -73,7 +52,9 @@ def allocate_dates_with_csp(spec, design, impl, end, holidays, documents, constr
     for docA, docB in constraints:
         csp.add_constraint(PublicationDependencyConstraint(docA, docB))
     
-    return csp.backtracking_search()
+    solution = csp.backtracking_search()
+
+    return solution
 
 
 
@@ -88,7 +69,7 @@ def app():
 
     safety_analysis_included = st.sidebar.checkbox("안전성 분석 보고서 포함", value=True)
     cyber_security_included = st.sidebar.checkbox("사이버보안 평가 보고서 포함", value=True)
-
+    
     if not safety_analysis_included:
         df = df[~df['문서명'].str.contains('안전성')]
 
@@ -96,37 +77,40 @@ def app():
         df = df[~df['문서명'].str.contains('사이버보안')]
     
     filtered_df = df
+    
     # Sample holidays list
     holidays = [pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-02")]
 
     # Assign publication dates conditions to a single configuration
-    with st.sidebar.form('입력문서 발행일자 설정'):
-        spec_date = st.date_input("요구사항 명세서 발행일",value=datetime.date.today())
-        design_date = st.date_input("설계 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=7))
-        impl_date = st.date_input("구현 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=14))
-        end_date = st.date_input("발행 마감일", value=datetime.date.today()+datetime.timedelta(days=21))
-        expander = st.expander("시험 수행 소요일자")
-        with expander:
-            ct_dates = st.number_input("CT 시험", min_value=1, value=3)
-            it_dates = st.number_input("IT 시험", min_value=1, value=3)
-            st_dates = st.number_input("ST 시험", min_value=1, value=3)
-        submitted = st.form_submit_button('확인')
+    
+    spec_date = st.sidebar.date_input("요구사항 명세서 발행일",value=datetime.date.today())
+    design_date = st.sidebar.date_input("설계 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=7))
+    impl_date = st.sidebar.date_input("구현 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=14))
+    end_date = st.sidebar.date_input("발행 마감일", value=datetime.date.today()+datetime.timedelta(days=28))
+    #expander = st.expander("시험 수행 소요일자")
+    #with expander:
+        #ct_dates = st.number_input("CT 시험", min_value=1, value=3)
+        #it_dates = st.number_input("IT 시험", min_value=1, value=3)
+        #st_dates = st.number_input("ST 시험", min_value=1, value=3)
+    
+    
 
     ordered_docs, date_dependencies = select_publication_stages(filtered_df, None)
     
-    if submitted:
-        allocated_dates = allocate_dates_with_csp(spec_date, design_date, impl_date, end_date, holidays, documents=ordered_docs, constraints=date_dependencies)
-        if allocate_dates is None:
-            st.write("## Unsatisfied")
-        else:
-            st.write("## dates_df")
-            dates_df = pd.DataFrame(list(allocated_dates.items()), columns=["문서명", "날짜"])
-            dates_df['날짜'] = pd.to_datetime(dates_df['날짜']).dt.strftime('%y.%m.%d')
-            grid_response = AgGrid(dates_df, editable=True, height=600, width=400, fit_columns_on_grid_load=True)
-            updated_df = pd.DataFrame(grid_response["data"])
+    
+    allocated_dates = allocate_dates_with_csp(spec_date, design_date, impl_date, end_date, holidays, documents=ordered_docs, constraints=date_dependencies)        
+        
+    if allocated_dates is None:
+        st.info(" 주어진 설정을 만족시키는 발행일자가 없습니다. 설정한 조건이 올바른지 확인해주세요.", icon="ℹ️")
+    else:
+        st.write("## dates_df")
+        dates_df = pd.DataFrame(list(allocated_dates.items()), columns=["문서명", "날짜"])
+        dates_df['날짜'] = pd.to_datetime(dates_df['날짜']).dt.strftime('%y.%m.%d')
+        grid_response = AgGrid(dates_df, editable=True, height=600, width=400, fit_columns_on_grid_load=True)
+        updated_df = pd.DataFrame(grid_response["data"])
 
-            st.subheader("Updated DataFrame:")
-            st.write(updated_df)
+        st.subheader("Updated DataFrame:")
+        st.write(updated_df)
 
     #allocated_dates = {}
 
