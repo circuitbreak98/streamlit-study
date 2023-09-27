@@ -6,7 +6,7 @@ import streamlit as st
 from st_aggrid import AgGrid
 
 from csp import CSP
-from date_generation import PublicationDependencyConstraint, date_range
+from date_generation import TestPublicationDependencyConstraint, PublicationDependencyConstraint, date_range
 
 # Load the Excel data and clean it
 def load_data():
@@ -25,10 +25,12 @@ def select_publication_stages(stage, configs):
     documents, dependencies = stage["문서명"].values.tolist(), create_dependency_edges(dependency_list, configs)
     return (documents, dependencies)
 
-def allocate_dates_with_csp(spec, design, impl, end, holidays, documents, constraints):
+def allocate_dates_with_csp(spec, design, impl, end, holidays, documents, constraints, test_configs):
     spec_date_list = list(date_range(spec, design, holidays))
     design_date_list = list(date_range(design, impl, holidays))
     remaining_date_list = list(date_range(impl, end, holidays))
+
+    ct_days, it_days, st_days = test_configs
 
     variables = documents
     domains = {}
@@ -51,7 +53,12 @@ def allocate_dates_with_csp(spec, design, impl, end, holidays, documents, constr
 
     for docA, docB in constraints:
         csp.add_constraint(PublicationDependencyConstraint(docA, docB))
-    
+        if docA == "컴포넌트 시험 절차서" and docB == "컴포넌트 시험 보고서":
+            csp.add_constraint(TestPublicationDependencyConstraint(docA, (docB, ct_days)))
+        elif docA == "통합시험 절차서" and docB == "통합시험 보고서":
+            csp.add_constraint(TestPublicationDependencyConstraint(docA, (docB, it_days)))
+        elif docA == "시스템시험 절차서" and docB == "시스템시험 보고서":
+            csp.add_constraint(TestPublicationDependencyConstraint(docA, (docB, st_days)))
     solution = csp.backtracking_search()
 
     return solution
@@ -87,18 +94,18 @@ def app():
     design_date = st.sidebar.date_input("설계 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=7))
     impl_date = st.sidebar.date_input("구현 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=14))
     end_date = st.sidebar.date_input("발행 마감일", value=datetime.date.today()+datetime.timedelta(days=28))
-    #expander = st.expander("시험 수행 소요일자")
-    #with expander:
-        #ct_dates = st.number_input("CT 시험", min_value=1, value=3)
-        #it_dates = st.number_input("IT 시험", min_value=1, value=3)
-        #st_dates = st.number_input("ST 시험", min_value=1, value=3)
+    expander = st.sidebar.expander("시험 수행 소요일자")
+    with expander:
+        ct_days = st.number_input("CT 시험", min_value=1, value=3)
+        it_days = st.number_input("IT 시험", min_value=1, value=3)
+        st_days = st.number_input("ST 시험", min_value=1, value=3)
     
-    
+    test_configs = (ct_days, it_days, st_days)
 
     ordered_docs, date_dependencies = select_publication_stages(filtered_df, None)
     
     
-    allocated_dates = allocate_dates_with_csp(spec_date, design_date, impl_date, end_date, holidays, documents=ordered_docs, constraints=date_dependencies)        
+    allocated_dates = allocate_dates_with_csp(spec_date, design_date, impl_date, end_date, holidays, documents=ordered_docs, constraints=date_dependencies, test_configs=test_configs)        
         
     if allocated_dates is None:
         st.info(" 주어진 설정을 만족시키는 발행일자가 없습니다. 설정한 조건이 올바른지 확인해주세요.", icon="ℹ️")
@@ -106,7 +113,7 @@ def app():
         st.write("## dates_df")
         dates_df = pd.DataFrame(list(allocated_dates.items()), columns=["문서명", "날짜"])
         dates_df['날짜'] = pd.to_datetime(dates_df['날짜']).dt.strftime('%y.%m.%d')
-        grid_response = AgGrid(dates_df, editable=True, height=600, width=400, fit_columns_on_grid_load=True)
+        grid_response = AgGrid(dates_df, editable=True, height=800, width=200)
         updated_df = pd.DataFrame(grid_response["data"])
 
         st.subheader("Updated DataFrame:")

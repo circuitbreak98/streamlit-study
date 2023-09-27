@@ -1,5 +1,5 @@
 import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from csp import Constraint, CSP
 
@@ -17,6 +17,20 @@ class PublicationDependencyConstraint(Constraint[str, str]):
         # Return True if docB's date is after docA's date
         return assignment[self.docA] < assignment[self.docB]
 
+
+class TestPublicationDependencyConstraint(Constraint[str, Tuple[str, int]]):
+    def __init__(self, docA: str, docBanddays: Tuple[str, int]):
+        super().__init__([docA, docBanddays])
+        self.docA = docA
+        self.docB = docBanddays[0]
+        self.day = docBanddays[1]
+
+    def satisfied(self, assignment: Dict[str, datetime.date]) -> bool:
+        # If either variable is not in the assignment, then it's not yet possible to violate the constraint
+        if self.docA not in assignment or self.docB not in assignment:
+            return True
+        # Return True if docB's date is after docA's date
+        return assignment[self.docA] < assignment[self.docB] + datetime.timedelta(days=self.day)
 
 def date_range(start_date, end_date, holidays):
     delta: datetime.timedelta = datetime.timedelta(days=1)
