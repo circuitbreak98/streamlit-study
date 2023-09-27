@@ -48,17 +48,19 @@ def allocate_dates_with_csp(spec, design, impl, end, holidays, documents, constr
             domains[variable] = design_date_list
         else:
             domains[variable] = remaining_date_list
-
+    
     csp = CSP[str, datetime.date](variables, domains)
 
     for docA, docB in constraints:
+    
         csp.add_constraint(PublicationDependencyConstraint(docA, docB))
         if docA == "컴포넌트 시험 절차서" and docB == "컴포넌트 시험 보고서":
-            csp.add_constraint(TestPublicationDependencyConstraint(docA, (docB, ct_days)))
+            csp.add_constraint(TestPublicationDependencyConstraint(docA, docB, ct_days))
         elif docA == "통합시험 절차서" and docB == "통합시험 보고서":
-            csp.add_constraint(TestPublicationDependencyConstraint(docA, (docB, it_days)))
+            csp.add_constraint(TestPublicationDependencyConstraint(docA, docB, it_days))
         elif docA == "시스템시험 절차서" and docB == "시스템시험 보고서":
-            csp.add_constraint(TestPublicationDependencyConstraint(docA, (docB, st_days)))
+            csp.add_constraint(TestPublicationDependencyConstraint(docA, docB, st_days))
+    
     solution = csp.backtracking_search()
 
     return solution
@@ -96,9 +98,9 @@ def app():
     end_date = st.sidebar.date_input("발행 마감일", value=datetime.date.today()+datetime.timedelta(days=28))
     expander = st.sidebar.expander("시험 수행 소요일자")
     with expander:
-        ct_days = st.number_input("CT 시험", min_value=1, value=3)
-        it_days = st.number_input("IT 시험", min_value=1, value=3)
-        st_days = st.number_input("ST 시험", min_value=1, value=3)
+        ct_days = st.number_input("CT 시험", min_value=1, value=1)
+        it_days = st.number_input("IT 시험", min_value=1, value=1)
+        st_days = st.number_input("ST 시험", min_value=1, value=1)
     
     test_configs = (ct_days, it_days, st_days)
 

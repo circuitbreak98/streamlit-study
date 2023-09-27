@@ -18,19 +18,19 @@ class PublicationDependencyConstraint(Constraint[str, str]):
         return assignment[self.docA] < assignment[self.docB]
 
 
-class TestPublicationDependencyConstraint(Constraint[str, Tuple[str, int]]):
-    def __init__(self, docA: str, docBanddays: Tuple[str, int]):
-        super().__init__([docA, docBanddays])
+class TestPublicationDependencyConstraint(Constraint[str, str]):
+    def __init__(self, docA: str, docB: str, days:int):
+        super().__init__([docA, docB])
         self.docA = docA
-        self.docB = docBanddays[0]
-        self.day = docBanddays[1]
-
+        self.docB = docB
+        self.days = days
+        
     def satisfied(self, assignment: Dict[str, datetime.date]) -> bool:
         # If either variable is not in the assignment, then it's not yet possible to violate the constraint
         if self.docA not in assignment or self.docB not in assignment:
             return True
         # Return True if docB's date is after docA's date
-        return assignment[self.docA] < assignment[self.docB] + datetime.timedelta(days=self.day)
+        return assignment[self.docA] + datetime.timedelta(days=self.days) < assignment[self.docB] 
 
 def date_range(start_date, end_date, holidays):
     delta: datetime.timedelta = datetime.timedelta(days=1)
