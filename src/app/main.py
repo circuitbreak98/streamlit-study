@@ -80,10 +80,15 @@ def app():
     cyber_security_included = st.sidebar.checkbox("사이버보안 평가 보고서 포함", value=True)
     
     if not safety_analysis_included:
-        df = df[~df['문서명'].str.contains('안전성')]
-
+        df = df[~df['문서명'].str.contains('안전성', na=False)]
+        df.loc[df['의존 문서#1'].str.contains('안전성', na=False), '의존 문서#1'] = None
+        df.loc[df['의존 문서#2'].str.contains('안전성', na=False), '의존 문서#2'] = None
+        df.loc[df['의존 문서#3'].str.contains('안전성', na=False), '의존 문서#3'] = None
     if not cyber_security_included:
-        df = df[~df['문서명'].str.contains('사이버보안')]
+        df = df[~df['문서명'].str.contains('사이버보안', na=False)]
+        df.loc[df['의존 문서#1'].str.contains('사이버보안', na=False), '의존 문서#1'] = None
+        df.loc[df['의존 문서#2'].str.contains('사이버보안', na=False), '의존 문서#2'] = None
+        df.loc[df['의존 문서#3'].str.contains('사이버보안', na=False), '의존 문서#3'] = None
     
     filtered_df = df
     
@@ -92,26 +97,29 @@ def app():
 
     # Assign publication dates conditions to a single configuration
     
-    spec_date = st.sidebar.date_input("요구사항 명세서 발행일",value=datetime.date.today())
-    design_date = st.sidebar.date_input("설계 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=7))
-    impl_date = st.sidebar.date_input("구현 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=14))
-    end_date = st.sidebar.date_input("발행 마감일", value=datetime.date.today()+datetime.timedelta(days=28))
-    expander = st.sidebar.expander("시험 수행 소요일자")
-    with expander:
-        ct_days = st.number_input("CT 시험", min_value=1, value=1)
-        it_days = st.number_input("IT 시험", min_value=1, value=1)
-        st_days = st.number_input("ST 시험", min_value=1, value=1)
-    
+    with st.sidebar.form('설정'):
+        spec_date = st.date_input("요구사항 명세서 발행일",value=datetime.date.today())
+        design_date = st.date_input("설계 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=7))
+        impl_date = st.date_input("구현 명세서 발행일", value=datetime.date.today()+datetime.timedelta(days=14))
+        end_date = st.date_input("발행 마감일", value=datetime.date.today()+datetime.timedelta(days=28))
+        expander = st.expander("시험 수행 소요일자")
+        with expander:
+            ct_days = st.number_input("CT 시험", min_value=1, value=1)
+            it_days = st.number_input("IT 시험", min_value=1, value=1)
+            st_days = st.number_input("ST 시험", min_value=1, value=1)
+        submitted = st.form_submit_button('확인')
+
     test_configs = (ct_days, it_days, st_days)
 
     ordered_docs, date_dependencies = select_publication_stages(filtered_df, None)
     
     
     allocated_dates = allocate_dates_with_csp(spec_date, design_date, impl_date, end_date, holidays, documents=ordered_docs, constraints=date_dependencies, test_configs=test_configs)        
-        
-    if allocated_dates is None:
+    
+    if submitted and allocated_dates is None:
         st.info(" 주어진 설정을 만족시키는 발행일자가 없습니다. 설정한 조건이 올바른지 확인해주세요.", icon="ℹ️")
-    else:
+        st.stop()
+    elif submitted and allocated_dates is not None:
         st.write("## dates_df")
         dates_df = pd.DataFrame(list(allocated_dates.items()), columns=["문서명", "날짜"])
         dates_df['날짜'] = pd.to_datetime(dates_df['날짜']).dt.strftime('%y.%m.%d')
@@ -120,6 +128,9 @@ def app():
 
         st.subheader("Updated DataFrame:")
         st.write(updated_df)
+    
+    else:
+        st.stop()
 
     #allocated_dates = {}
 
