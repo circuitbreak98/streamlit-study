@@ -74,3 +74,4 @@ if __name__ == "__main__":
                 (row, col) = (grid_locations[index].row, grid_locations[index].column)
                 grid[row][col] = letter
         display_grid(grid)
+        

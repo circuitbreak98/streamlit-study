@@ -118,7 +118,7 @@ def app():
     
     if submitted and allocated_dates is None:
         st.info(" 주어진 설정을 만족시키는 발행일자가 없습니다. 설정한 조건이 올바른지 확인해주세요.", icon="ℹ️")
-        st.stop()
+        
     elif submitted and allocated_dates is not None:
         st.write("## dates_df")
         dates_df = pd.DataFrame(list(allocated_dates.items()), columns=["문서명", "날짜"])
